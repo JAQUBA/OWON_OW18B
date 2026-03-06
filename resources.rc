@@ -1,4 +1,10 @@
 #include <windows.h>
 
+// Identyfikator ikony
+#define IDI_APP_ICON 101
+
+// Ikona aplikacji
+IDI_APP_ICON ICON "resources/icon.ico"
+
 // Manifest aplikacji
 1 RT_MANIFEST "app.manifest"

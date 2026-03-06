@@ -1,6 +1,6 @@
-# OWON OW18B — Multimetr Bluetooth (Windows)
+# OWON OW18B — Bluetooth Multimeter (Windows)
 
-Natywna aplikacja desktopowa Windows do komunikacji z multimetrem **OWON OW18B** przez Bluetooth Low Energy (BLE). Odbiera pomiary w czasie rzeczywistym, wyświetla je w GUI z wykresem i logowaniem danych.
+Native Windows desktop application for communicating with the **OWON OW18B** multimeter via Bluetooth Low Energy (BLE). Receives real-time measurements, displays them in a dark-themed GUI with a chart, and supports remote control, CSV recording, statistics, and an OBS overlay.
 
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-blue)
 ![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D6)
@@ -9,205 +9,246 @@ Natywna aplikacja desktopowa Windows do komunikacji z multimetrem **OWON OW18B**
 
 ---
 
-## Funkcje
+## Features
 
-- **Skanowanie BLE** — automatyczne wykrywanie multimetrów OWON OW18B w zasięgu
-- **Wyświetlacz LCD** — duży, czytelny wyświetlacz wartości w stylu multimetru (Consolas, zielony na czarnym tle)
-- **Wykres czasu rzeczywistego** — 60-sekundowe okno z autoskalowaniem i odświeżaniem 10 FPS
-- **Min/Max** — ciągłe śledzenie wartości minimalnej i maksymalnej
-- **Tryby pomiaru** — pełna obsługa wszystkich trybów OW18B:
+- **BLE scanning** — automatic detection of OWON OW18B multimeters in range
+- **LCD display** — large, readable value display in multimeter style (Consolas, green on black)
+- **Real-time chart** — 60-second window with auto-scaling and 10 FPS refresh
+- **MIN/MAX/AVG/PEAK statistics** — continuous tracking with reset option
+- **Remote control** — send commands to the multimeter via BLE (SELECT, HOLD, RANGE, Hz/DUTY)
+- **CSV recording** — save measurements to CSV files with auto-timestamp
+- **OBS overlay window** — customizable always-on-top overlay for streaming
+- **Keyboard shortcuts** — configurable global hotkeys with a settings dialog
+- **Dark theme** — consistent dark color palette across all UI elements
+- **Measurement modes** — full support for all OW18B modes:
 
-| Kategoria | Tryby |
-|-----------|-------|
-| Napięcie | DC V, AC V, DC mV, AC mV |
-| Prąd | DC µA, AC µA, DC mA, AC mA, DC A, AC A |
-| Rezystancja | Ω (z prefiksami k/M) |
-| Inne | Ciągłość, Dioda, Pojemność (nF/µF/mF), Częstotliwość (Hz/kHz/MHz) |
-| Specjalne | Temperatura °C/°F, Duty Cycle %, hFE, NCV |
+| Category | Modes |
+|----------|-------|
+| Voltage | DC V, AC V, DC mV, AC mV |
+| Current | DC µA, AC µA, DC mA, AC mA, DC A, AC A |
+| Resistance | Ω (with k/M prefixes) |
+| Other | Continuity, Diode, Capacitance (nF/µF/mF), Frequency (Hz/kHz/MHz) |
+| Special | Temperature °C/°F, Duty Cycle %, hFE, NCV |
 
-- **Flagi** — obsługa AUTO, HOLD, DELTA, Over Limit (OL)
-- **Logowanie** — log pomiarów z opcjonalnym widokiem surowych danych hex
-
----
-
-## Wymagania
-
-| Wymaganie | Minimum |
-|-----------|---------|
-| System operacyjny | Windows 10 (build 1809+) |
-| Adapter Bluetooth | BLE 4.0+ |
-| Build system | [PlatformIO](https://platformio.org/) (CLI lub wtyczka VS Code) |
-| Kompilator | MSVC / MinGW z obsługą C++17 |
+- **Flags** — AUTO, HOLD, DELTA, LOW_BAT, Over Limit (OL)
 
 ---
 
-## Instalacja i budowanie
+## Requirements
 
-### 1. Klonowanie repozytorium
+| Requirement | Minimum |
+|-------------|---------|
+| Operating system | Windows 10 (build 1809+) |
+| Bluetooth adapter | BLE 4.0+ |
+| Build system | [PlatformIO](https://platformio.org/) (CLI or VS Code extension) |
+| Compiler | MinGW GCC with C++17 support |
+
+---
+
+## Installation & Build
+
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<twoj-user>/OWON_OW18B.git
+git clone https://github.com/<your-user>/OWON_OW18B.git
 cd OWON_OW18B
 ```
 
-### 2. Budowanie z PlatformIO
+### 2. Build with PlatformIO
 
 ```bash
 # PlatformIO CLI
 pio run -e app
 
-# Lub w VS Code z wtyczką PlatformIO — kliknij "Build"
+# Or in VS Code with the PlatformIO extension — click "Build"
 ```
 
-Zależność [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) zostanie pobrana automatycznie przez PlatformIO.
+The [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) dependency will be downloaded automatically by PlatformIO.
 
-### 3. Uruchomienie
+### 3. Run
 
 ```bash
 pio run -e app -t exec
 
-# Lub uruchom bezpośrednio plik wykonywalny:
+# Or run the executable directly:
 .pio\build\app\program.exe
 ```
 
 ---
 
-## Użytkowanie
+## Usage
 
-1. **Włącz multimetr** OWON OW18B i upewnij się, że Bluetooth jest aktywny
-2. **Uruchom aplikację** — pojawi się okno „OWON OW18B — Multimetr BLE"
-3. **Kliknij „Skanuj BLE"** — aplikacja szuka urządzeń BLE przez 10 sekund
-4. **Wybierz urządzenie** z listy rozwijanej
-5. **Kliknij „Połącz"** — dane pomiarowe pojawią się na wyświetlaczu i wykresie
-6. **Kliknij „Rozłącz"** aby zakończyć sesję
+1. **Turn on** the OWON OW18B multimeter and ensure Bluetooth is active
+2. **Launch the application** — the "OWON OW18B — BLE Multimeter" window appears
+3. **Click "Scan BLE"** — the app searches for BLE devices for 10 seconds
+4. **Select a device** from the dropdown list
+5. **Click "Connect"** — measurement data appears on the display and chart
+6. **Click "Disconnect"** to end the session
 
-### Opcje
+### Menu Bar
 
-- **Wykres aktywny** — włącz/wyłącz zapis na wykresie
-- **Loguj dane RAW (hex)** — pokaż surowe 6-bajtowe pakiety BLE w logu
-- **Reset Min/Max** — wyzeruj śledzenie wartości ekstremalnych
-- **Wyczyść wykres / log** — usuń historyczne dane
+```
+File → Record CSV | Stop Recording | Close
+Connection → Scan BLE | Connect | Disconnect
+Control → SELECT | HOLD | RANGE | Hz/DUTY
+View → OBS Overlay Window
+Settings → Keyboard Shortcuts... | ✓ Chart Active | ✓ Log RAW Data | Reset Statistics
+Help → About...
+```
+
+### Options
+
+- **Chart Active** — enable/disable chart recording
+- **Log RAW Data (hex)** — show raw 6-byte BLE packets in the log
+- **Reset Statistics** — reset MIN/MAX/AVG/PEAK tracking
+- **OBS Overlay Window** — open a customizable overlay for OBS Studio
+- **Keyboard Shortcuts** — configure hotkeys for remote multimeter control
 
 ---
 
-## Architektura projektu
+## Project Architecture
 
 ```
 OWON_OW18B/
 ├── .github/
-│   └── copilot-instructions.md   # Instrukcje dla GitHub Copilot
+│   └── copilot-instructions.md   # GitHub Copilot instructions
 ├── include/
-│   └── OW18BParser.h             # Nagłówek parsera protokołu OW18B
+│   └── OW18BParser.h             # OW18B protocol parser header
 ├── src/
-│   ├── main.cpp                  # GUI (SimpleWindow), logika BLE, punkt wejścia
-│   └── OW18BParser.cpp           # Implementacja parsera protokołu BLE
-├── platformio.ini                # Konfiguracja PlatformIO (native, JQB_WindowsLib)
-├── app.manifest                  # Manifest Windows Common Controls v6
-├── resources.rc                  # Plik zasobów (osadzenie manifestu)
-└── README.md                     # Ten plik
+│   ├── main.cpp                  # Entry point: setup(), loop() — module orchestration
+│   ├── AppState.h / .cpp         # Global state, helpers, shared actions, INI config
+│   ├── AppUI.h / .cpp            # UI component creation (dark theme)
+│   ├── BLEHandler.h / .cpp       # BLE callbacks, data parsing, fan-out pipeline
+│   ├── MenuHandler.h / .cpp      # Menu bar, command routing
+│   ├── MeterOverlay.h / .cpp     # OBS overlay window (OverlayWindow subclass)
+│   ├── OW18B_Commands.h          # Multimeter control commands (2-byte BLE write)
+│   └── OW18BParser.cpp           # BLE protocol parser implementation
+├── platformio.ini                # PlatformIO config (platform: native)
+├── owon_meter.ini                # User config (shortcuts, settings, auto-saved)
+├── app.manifest                  # Windows Common Controls v6 manifest
+├── resources.rc                  # Windows resource file (icon + manifest)
+└── resources/
+    └── icon.ico                  # Application icon
 ```
 
-### Moduły
+### Modules
 
-| Moduł | Opis |
-|-------|------|
-| **OW18BParser** | Bezstanowy parser 6-bajtowego protokołu BLE. Dekoduje tryb pomiaru, skalę, flagi, wartość 16-bit i zwraca strukturę `Measurement`. |
-| **main.cpp (GUI)** | Okno Win32 z komponentami JQB_WindowsLib: ValueDisplay (LCD), Chart (wykres), TextArea (log), Select (lista urządzeń), przyciski i checkboxy. |
-| **BLE** | Komunikacja przez `BLE` z JQB_WindowsLib. Callbacki: `onDeviceDiscovered`, `onConnect`, `onDisconnect`, `onReceive`, `onError`. |
+| Module | Responsibility |
+|--------|---------------|
+| **main.cpp** | `setup()` / `loop()` — window, menu, UI, BLE, hotkeys initialization (~65 lines) |
+| **AppState** | Global variables, helpers (`logMsg()`, `sendCommand()`, `resetStats()`), shared actions (`doScanBLE()`, `doConnectBLE()`, `doRecordStart()` etc.), INI load/save |
+| **AppUI** | `createUI()` — all UI components with dark theme; `styleBtn()` helper for consistent button styling |
+| **BLEHandler** | `setupBLE()` — BLE callback registration; `handleBLEData()` — packet parsing → UI/overlay/stats/chart/CSV/log fan-out |
+| **MenuHandler** | `createAppMenu()` — HMENU creation; `handleMenuCommand()` — command routing; `updateMenuChecks()` |
+| **MeterOverlay** | `OverlayWindow` subclass — renders measurement value (Consolas) and mode/flags (Segoe UI) for OBS |
+| **OW18B_Commands** | Inline functions returning `std::vector<uint8_t>{button_id, press_type}` for 2-byte commands |
+| **OW18BParser** | Stateless 6-byte protocol parser — `OW18B::Parser::parse()` (MartMet/OW18B bitfield format) |
+
+### Data Pipeline
+
+```
+BLE.onReceive() → handleBLEData()
+    ├── OW18B::Parser::parse()     → Measurement struct
+    ├── valueDisplay->updateValue() → LCD display
+    ├── overlayWindow->updateValue()→ OBS overlay
+    ├── stats.addSample()          → MIN/MAX/AVG/PEAK
+    ├── chart->addDataPoint()      → real-time chart
+    ├── dataLogger.addRow()        → CSV file
+    └── logMsg()                   → text log
+```
 
 ---
 
-## Protokół BLE OWON OW18B
+## BLE Protocol — OWON OW18B
 
-Multimetr wysyła **6-bajtowe pakiety** przez BLE Notify:
+The multimeter sends **6-byte packets** via BLE Notify (bitfield format — source: [MartMet/OW18B](https://github.com/MartMet/OW18B)):
 
-```
-Bajt:  [0]        [1]      [2]       [3]       [4]       [5]
-       Funkcja    Skala    Flagi1    Flagi2    Val_Lo    Val_Hi
-```
+| Byte(s) | Description |
+|---------|-------------|
+| 0-1 | Word0 (16-bit LE) — bitfields: bits 0-2 = Divisor, bits 3-5 = Prefix, bits 6-9 = Mode |
+| 2 | Flags: bit 0 = HOLD, bit 1 = REL/DELTA, bit 2 = AUTO, bit 3 = LOW_BAT |
+| 3 | Reserved |
+| 4-5 | Value: signed int16_t little-endian |
 
-### Dekodowanie wartości (bajty 4–5)
+### Divisor (3 bits: 0-2)
 
-```
-Jeśli data[5] < 128:  wartość =  data[5] * 256 + data[4]
-Jeśli data[5] >= 128: wartość = -((data[5] - 128) * 256 + data[4])
-Over Limit:           rawValue >= 32767 (0x7FFF)
-```
+| Value | Meaning |
+|-------|---------|
+| 0-4 | D1, D10, D100, D1000, D10000 (value divisor) |
+| 5 | ERR |
+| 6 | Under Limit |
+| 7 | Over Limit |
 
-### Flagi (bajt 2)
+### Prefix (3 bits: 3-5)
 
-| Bit | Flaga |
-|-----|-------|
-| 0   | AUTO  |
-| 1   | HOLD  |
-| 2   | DELTA |
+| Value | Prefix |
+|-------|--------|
+| 0 | pico | 1 | nano | 2 | µ (micro) | 3 | milli |
+| 4 | none | 5 | kilo | 6 | Mega | 7 | Giga |
 
-### Kody funkcji (bajt 0)
+### Mode (4 bits: 6-9)
 
-| Kod | Tryb | Kod | Tryb |
-|-----|------|-----|------|
-| `0x11` | DC µA | `0x22` | DC V |
-| `0x12` | DC mA | `0x23` | Rezystancja Ω |
-| `0x13` | DC A | `0x24` | Ciągłość |
-| `0x15` | AC µA | `0x25` | Dioda |
-| `0x16` | AC mA | `0x26` | Pojemność F |
-| `0x17` | AC A | `0x27` | Częstotliwość Hz |
-| `0x19` | DC mV | `0x28` | Temperatura °C |
-| `0x1A` | AC mV | `0x29` | Temperatura °F |
-| `0x21` | AC V | `0x2A` | Duty Cycle % |
-| | | `0x2D` | hFE |
-| | | `0x30` | NCV |
+| Value | Mode | Value | Mode |
+|-------|------|-------|------|
+| 0 | DC V | 7 | % (Duty) |
+| 1 | AC V | 8 | °C |
+| 2 | DC A | 9 | °F |
+| 3 | AC A | 10 | Diode |
+| 4 | Ω | 11 | Continuity |
+| 5 | F (Capacitance) | 12 | hFE |
+| 6 | Hz | 13 | NCV |
+
+### BLE UUIDs
+
+| Role | UUID |
+|------|------|
+| Service | `0000fff0-0000-1000-8000-00805f9b34fb` |
+| Notify (data) | `0000fff4-0000-1000-8000-00805f9b34fb` |
+| Write (commands) | `0000fff3-0000-1000-8000-00805f9b34fb` |
+
+### Control Commands (BLE Write)
+
+**Format:** 2 bytes `{button_id, press_type}` — short press = `0x01`, long press = `0x00`
+
+| Command | Bytes |
+|---------|-------|
+| SELECT | `{0x01, 0x01}` |
+| HOLD | `{0x03, 0x01}` |
+| RANGE | `{0x02, 0x01}` |
+| Hz/DUTY | `{0x04, 0x01}` |
 
 ---
 
-## Zależności
+## Dependencies
 
-- [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) — lekka biblioteka Win32 UI (automatycznie pobierana przez PlatformIO)
-   - Komponenty UI: `SimpleWindow`, `Label`, `Button`, `Select`, `TextArea`, `ProgressBar`, `Chart`, `ValueDisplay`, `CheckBox`
+- [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) — lightweight Win32 UI library (auto-downloaded by PlatformIO)
+   - UI: `SimpleWindow`, `OverlayWindow`, `Label`, `Button`, `Select`, `TextArea`, `ProgressBar`, `Chart`, `ValueDisplay`, `CheckBox`
    - BLE: `IO/BLE/BLE.h`
-   - Narzędzia: `Util/StringUtils.h`
+   - Util: `StringUtils`, `ConfigManager`, `DataLogger`, `HotkeyManager`, `Statistics`
 
 ---
 
-## Rozwijanie projektu
+## Configuration — `owon_meter.ini`
 
-### Dodawanie nowego trybu pomiaru
-
-1. Dodaj stałą do `enum class MeasurementMode` w [include/OW18BParser.h](include/OW18BParser.h)
-2. Uzupełnij metody w [src/OW18BParser.cpp](src/OW18BParser.cpp):
-   - `getModeString()` — nazwa trybu (wide string)
-   - `getUnitString()` — jednostka
-   - `getDivisor()` — dzielnik wartości dla każdej skali
-   - `getPrecision()` — liczba miejsc po przecinku
-   - `parse()` — logika prefiksu (k/M/m/µ/n) jeśli potrzebna
-
-### Dodawanie komponentów UI
-
-Twórz obiekty klas z JQB_WindowsLib i dodawaj do okna:
-
-```cpp
-auto* btn = new Button(x, y, w, h, "Etykieta", [](Button*) {
-    // callback kliknięcia
-});
-window->add(btn);
-```
-
-### Konwencje
-
-- **Polski** — komentarze, teksty UI, nazwy zmiennych UI
-- **Angielski** — nazwy klas, metod, parametrów
-- `std::wstring` / `L"..."` — wszystkie teksty wyświetlane (Unicode: Ω, µ, °)
-- Wcięcia: 4 spacje
-- Sekcje kodu oddzielane komentarzami `// ===...===`
+| Key | Description | Default |
+|-----|-------------|---------|
+| `chart_enabled` | Chart active | `1` |
+| `log_raw_data` | Log RAW hex data | `0` |
+| `shortcut_select` | Shortcut: SELECT | `Ctrl+Alt+1` |
+| `shortcut_hold` | Shortcut: HOLD | `Ctrl+Alt+2` |
+| `shortcut_range` | Shortcut: RANGE | `Ctrl+Alt+3` |
+| `shortcut_hzduty` | Shortcut: Hz/DUTY | `Ctrl+Alt+4` |
+| `shortcut_hold_long` | Shortcut: HOLD (long) | `Ctrl+Shift+Alt+2` |
+| `overlay_*` | Overlay position, size, colors | (various) |
 
 ---
 
-## Licencja
+## License
 
-Ten projekt jest udostępniony na licencji MIT. Szczegóły w pliku [LICENSE](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Autor
+## Author
 
-Projekt oparty na bibliotece [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) autorstwa [JAQUBA](https://github.com/JAQUBA).
+Built with [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) by [JAQUBA](https://github.com/JAQUBA).

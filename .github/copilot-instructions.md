@@ -1,75 +1,271 @@
 # Copilot Instructions — OWON OW18B
 
-## Opis projektu
+## Project Description
 
-Natywna aplikacja desktopowa Windows (C++) do komunikacji z multimetrem **OWON OW18B** przez Bluetooth Low Energy (BLE). Aplikacja odbiera 6-bajtowe pakiety pomiarowe, parsuje je i wyświetla wyniki w GUI z wykresem czasu rzeczywistego.
+Native Windows desktop application (C++) for communicating with the **OWON OW18B** multimeter via Bluetooth Low Energy (BLE). The app receives 6-byte measurement packets, parses them, and displays results in a dark-themed GUI with a real-time chart. It supports remote multimeter control (BLE commands), CSV recording, MIN/MAX/AVG/PEAK statistics, configurable keyboard shortcuts, and an OBS Studio overlay window.
 
-## Architektura
+## Architecture
 
 ```
 OWON_OW18B/
 ├── include/
-│   └── OW18BParser.h        # Nagłówek parsera protokołu OW18B (enum, struct, klasa)
+│   └── OW18BParser.h        # OW18B protocol parser header (enum, struct, class)
 ├── src/
-│   ├── main.cpp              # Punkt wejścia, GUI (SimpleWindow), logika BLE
-│   └── OW18BParser.cpp       # Implementacja parsera protokołu BLE
-├── platformio.ini            # Konfiguracja PlatformIO (platforma: native)
-├── app.manifest              # Manifest Windows Common Controls v6
-└── resources.rc              # Plik zasobów Windows (osadzenie manifestu)
+│   ├── main.cpp              # Entry point: setup(), loop() — module orchestration
+│   ├── AppState.h / .cpp     # Global state, variables, helpers (logMsg, sendCommand, resetStats)
+│   ├── AppUI.h / .cpp        # UI component creation (createUI) with dark theme
+│   ├── BLEHandler.h / .cpp   # BLE callbacks, data parsing (handleBLEData, setupBLE)
+│   ├── MenuHandler.h / .cpp  # Menu bar, command routing
+│   ├── MeterOverlay.h / .cpp # OverlayWindow subclass — OBS overlay rendering meter values
+│   ├── OW18B_Commands.h      # Multimeter control commands (namespace OW18BCmd)
+│   └── OW18BParser.cpp       # BLE protocol parser implementation
+├── platformio.ini            # PlatformIO config (platform: native)
+├── owon_meter.ini            # User config (shortcuts, settings, auto-saved)
+├── resources/
+│   └── icon.ico              # Application icon
+├── app.manifest              # Windows Common Controls v6 manifest
+└── resources.rc              # Windows resource file (icon + manifest)
 ```
 
-## Stack technologiczny
+### Module Responsibilities
 
-- **Język**: C++17
-- **Build system**: PlatformIO (`platform = native`)
-- **UI framework**: [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) — lekka biblioteka Win32 UI
-- **Komunikacja**: Windows BLE API (poprzez JQB_WindowsLib `IO/BLE/BLE.h`)
-- **Platforma docelowa**: Windows 10+ (wymagany adapter Bluetooth 4.0+)
+| Module | Responsibility |
+|--------|---------------|
+| **main.cpp** | `setup()` / `loop()` — window, menu, UI, BLE, hotkeys init. ~65 lines. |
+| **AppState** | All global variable definitions (`window`, `ble`, `stats`, `config`, `hotkeyMgr`, `overlayWindow`), helpers (`logMsg()`, `sendCommand()`, `resetStats()`), shared actions (`doScanBLE()`, `doConnectBLE()`, `doRecordStart()` etc.), INI load/save |
+| **AppUI** | `createUI(SimpleWindow*)` — creates all UI components with dark theme; uses `styleBtn()` helper for compact button creation |
+| **BLEHandler** | `setupBLE()` — BLE callback registration and adapter init; `handleBLEData()` — packet parsing, UI/overlay/stats/chart/CSV update |
+| **MenuHandler** | `createAppMenu()` — HMENU menu bar construction; `handleMenuCommand(int)` — command routing; `updateMenuChecks()` — checkmark sync |
+| **MeterOverlay** | `OverlayWindow` subclass from library — renders measurement value (Consolas) and mode/flags (Segoe UI) in OBS overlay |
+| **OW18B_Commands** | Inline functions returning `std::vector<uint8_t>{button_id, press_type}` — 2-byte format |
+| **OW18BParser** | Stateless 6-byte protocol parser — `OW18B::Parser::parse()`. MartMet/OW18B bitfield format |
 
-## Konwencje kodowania
+## Tech Stack
 
-### Styl kodu
+- **Language**: C++17
+- **Build system**: PlatformIO (`platform = native`, MinGW-w64)
+- **UI framework**: [JQB_WindowsLib](https://github.com/JAQUBA/JQB_WindowsLib) — lightweight Win32 UI library
+- **Communication**: Windows BLE GATT API (via JQB_WindowsLib `IO/BLE/BLE.h`)
+- **Target platform**: Windows 10+ (Bluetooth 4.0+ adapter required)
 
-- Komentarze i nazwy zmiennych UI pisz **po polsku**
-- Nazwy klas, metod i parametrów — **po angielsku** (namespace `OW18B`, klasa `Parser`, metoda `parse`)
-- Stosuj `std::wstring` i `L"..."` dla tekstów wyświetlanych w UI (obsługa polskich znaków i symboli: Ω, µ, °)
-- Używaj sekcji z komentarzami `// ===...===` do organizacji kodu
-- Wcięcia: 4 spacje (nie taby)
+## Coding Conventions
 
-### Wzorzec aplikacji
+### Code Style
 
-- Biblioteka JQB_WindowsLib definiuje `setup()` i `loop()` — analogicznie do Arduino
-- `setup()` → inicjalizacja okna, komponentów UI, konfiguracja callbacków BLE
-- `loop()` → pętla główna (w tym projekcie pusta — dane obsługiwane przez callbacki)
-- Komponenty UI tworzone przez `new` i dodawane do `SimpleWindow` przez `window->add()`
+- Comments and UI variable names in **Polish**
+- Class names, methods, and parameters in **English** (namespace `OW18B`, class `Parser`, method `parse`)
+- Use `std::wstring` and `L"..."` for displayed UI text (Polish characters and symbols: Ω, µ, °)
+- Use section comments `// --- ... ---` for code organization in .cpp files
+- Indentation: 4 spaces (no tabs)
+- Explicit Wide WinAPI versions: `CreateFontW()`, `CreateWindowExW()`, `MessageBoxW()`, `LoadCursorW()` etc.
+- Do not use `std::thread` (use `CreateThread`), `std::to_wstring` (use `jqb_compat::to_wstring` from Core.h)
 
-### Protokół BLE OWON OW18B
+### Application Pattern
 
-Pakiet: **6 bajtów**
+- JQB_WindowsLib defines `setup()` and `loop()` — Arduino-like
+- `setup()` → load settings → window + menu → UI → BLE → keyboard shortcuts
+- `loop()` → main loop (empty — data handled by callbacks)
+- UI components created via `new` and added to `SimpleWindow` via `window->add()`
+- **Do not change** the `setup()` and `loop()` signatures — these are framework entry points
 
-| Bajt | Opis |
+### Dark Theme & UI Styling
+
+The app uses a consistent dark color palette defined in `createUI()`:
+
+```cpp
+colBtnBg     = RGB(50, 52, 62)      // standard button background
+colBtnText   = RGB(200, 210, 225)   // standard button text
+colBtnHover  = RGB(65, 68, 80)      // standard hover
+colAccent    = RGB(40, 130, 200)    // accent (connect button)
+colCtrl      = RGB(45, 90, 90)     // control buttons (SELECT etc.)
+colCtrlText  = RGB(150, 240, 220)   // control text (teal)
+colRecRed    = RGB(160, 40, 40)    // record button
+colDim       = RGB(42, 44, 52)     // secondary buttons
+colDimText   = RGB(160, 165, 175)   // secondary text
+```
+
+Helper function for button styling:
+```cpp
+static void styleBtn(SimpleWindow* win, Button* btn,
+                     COLORREF bg, COLORREF text, COLORREF hover) {
+    btn->setBackColor(bg); btn->setTextColor(text); btn->setHoverColor(hover);
+    win->add(btn);
+}
+```
+
+### Menu Bar
+
+```
+File → Record CSV | Stop Recording | Close
+Connection → Scan BLE | Connect | Disconnect
+Control → SELECT | HOLD | RANGE | Hz/DUTY
+View → OBS Overlay Window
+Settings → Keyboard Shortcuts... | ✓ Chart Active | ✓ Log RAW Data | Reset Statistics
+Help → About...
+```
+
+- Menu created in `MenuHandler::createAppMenu()` as `HMENU`, set via `window->setMenu(menu)`
+- Command routing via `window->onMenuCommand(handleMenuCommand)`
+- Menu command IDs: range `9000+` (defined in `MenuHandler.h`: `IDM_FILE_*`, `IDM_CONN_*`, `IDM_CTRL_*`, `IDM_VIEW_*`, `IDM_SET_*`, `IDM_HELP_*`)
+- Settings `chart_enabled` and `log_raw_data` saved to `owon_meter.ini` via `ConfigManager`
+- Checkmarks synced via `updateMenuChecks()`
+
+### Overlay Window (OBS Studio)
+
+- Class `MeterOverlay` in `MeterOverlay.h/.cpp` — **subclass** of `OverlayWindow` from JQB_WindowsLib
+- Opened from menu: View → OBS Overlay Window (`IDM_VIEW_OBS_OVERLAY = 9050`)
+- Inherits from library: WinAPI window, always-on-top, double-buffered GDI, context menu (colors, pin), position persistence
+- Overrides `onPaint()` — renders measurement value (Consolas bold) and mode/flags (Segoe UI)
+- Custom methods: `updateValue()`, `setMode()`, `setFlags()`
+- `enablePersistence(config, "overlay")` — auto-save/load position and colors to `owon_meter.ini`
+- Data updated in `BLEHandler.cpp` after each received packet
+- Base context menu IDs: 9100–9149 (from library), subclass: 9150+
+
+### Keyboard Shortcuts Dialog
+
+- Opened from menu: Settings → Keyboard Shortcuts...
+- Modal dialog (blocks main window)
+- Displays shortcut list with binding buttons
+- Click button → capture mode (`WH_KEYBOARD_LL` hook captures key combination)
+- Escape cancels capture
+- "Restore Defaults" button
+- Bindings auto-saved to `owon_meter.ini` via `HotkeyManager`
+
+### Configuration (owon_meter.ini)
+
+File managed by `ConfigManager` (auto-load in constructor, auto-save in destructor).
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `chart_enabled` | Whether chart is active | `1` |
+| `log_raw_data` | Log RAW hex data | `0` |
+| `shortcut_select` | Shortcut: SELECT | `Ctrl+Alt+1` |
+| `shortcut_hold` | Shortcut: HOLD | `Ctrl+Alt+2` |
+| `shortcut_range` | Shortcut: RANGE | `Ctrl+Alt+3` |
+| `shortcut_hzduty` | Shortcut: Hz/DUTY | `Ctrl+Alt+4` |
+| `shortcut_hold_long` | Shortcut: HOLD (long) | `Ctrl+Shift+Alt+2` |
+| `overlay_x` | Overlay window X position | `100` |
+| `overlay_y` | Overlay window Y position | `100` |
+| `overlay_w` | Overlay window width | `420` |
+| `overlay_h` | Overlay window height | `160` |
+| `overlay_ontop` | Overlay always on top | `1` |
+| `overlay_bg` | Overlay background color (COLORREF) | `0` (black) |
+| `overlay_text` | Overlay text color (COLORREF) | `65280` (green) |
+
+### BLE Protocol OWON OW18B
+
+Packet: **6 bytes** (bitfield format — source: [MartMet/OW18B](https://github.com/MartMet/OW18B))
+
+| Byte(s) | Description |
+|---------|-------------|
+| 0-1 | Word0 (16-bit LE) — bitfields: bits 0-2 = Divisor, bits 3-5 = Prefix, bits 6-9 = Mode |
+| 2 | Flags: bit 0 = HOLD, bit 1 = REL/DELTA, bit 2 = AUTO, bit 3 = LOW_BAT |
+| 3 | Reserved |
+| 4-5 | Value: signed int16_t little-endian |
+
+Divisor (3 bits):
+- 0-4: D1, D10, D100, D1000, D10000 (value divisor)
+- 5: ERR, 6: Under Limit, 7: Over Limit
+
+Prefix (3 bits):
+- 0: pico, 1: nano, 2: µ, 3: milli, 4: none, 5: kilo, 6: Mega, 7: Giga
+
+Mode (4 bits):
+- 0: DC V, 1: AC V, 2: DC A, 3: AC A, 4: Ω, 5: F, 6: Hz, 7: %, 8: °C, 9: °F, 10: Diode, 11: Continuity, 12: hFE, 13: NCV
+
+### Multimeter Control Commands (BLE write)
+
+**Format: 2 bytes** `{button_id, press_type}` (source: [MartMet/OW18B](https://github.com/MartMet/OW18B))
+
+```cpp
+namespace OW18BCmd {
+    // Button identifiers
+    BTN_SELECT = 0x01;  BTN_RANGE = 0x02;  BTN_HOLD = 0x03;  BTN_HZDUTY = 0x04;
+    // Press types
+    PRESS_SHORT = 0x01;  PRESS_LONG = 0x00;
+
+    // Inline functions returning std::vector<uint8_t>
+    SELECT()      → { 0x01, 0x01 }
+    SELECT_LONG() → { 0x01, 0x00 }
+    HOLD()        → { 0x03, 0x01 }
+    HOLD_LONG()   → { 0x03, 0x00 }
+    RANGE()       → { 0x02, 0x01 }
+    RANGE_LONG()  → { 0x02, 0x00 }
+    HZ_DUTY()     → { 0x04, 0x01 }
+    HZ_DUTY_LONG()→ { 0x04, 0x00 }
+}
+```
+
+Sending: `ble.write(cmd)` (2 bytes). Wrapper: `sendCommand(const std::vector<uint8_t>& cmd)` in AppState.
+
+### BLE UUIDs OWON OW18B
+
+| Role | UUID |
 |------|------|
-| 0    | Kod funkcji (tryb pomiaru) — enum `MeasurementMode` |
-| 1    | Skala / zakres (pozycja kropki dziesiętnej) |
-| 2    | Flagi 1 (bit 0: AUTO, bit 1: HOLD, bit 2: DELTA) |
-| 3    | Flagi 2 (zarezerwowane) |
-| 4-5  | Wartość 16-bit little-endian z kodowaniem znaku w bajcie 5 |
+| Service | `0000fff0-0000-1000-8000-00805f9b34fb` |
+| Notify (data reception) | `0000fff4-0000-1000-8000-00805f9b34fb` |
+| Write (commands) | `0000fff3-0000-1000-8000-00805f9b34fb` |
 
-Wartość:
-- `data[5] < 128` → dodatnia: `data[5] * 256 + data[4]`
-- `data[5] >= 128` → ujemna: `-((data[5] - 128) * 256 + data[4])`
-- Over Limit: `rawValue >= 32767` lub `0x7FFF`
+### Supported Measurement Modes
 
-### Obsługiwane tryby pomiaru
+DC/AC: V, mV, µA, mA, A | Resistance Ω | Continuity | Diode | Capacitance F | Frequency Hz | Temperature °C/°F | Duty Cycle % | hFE | NCV
 
-DC/AC: V, mV, µA, mA, A | Rezystancja Ω | Ciągłość | Dioda | Pojemność F | Częstotliwość Hz | Temperatura °C/°F | Duty Cycle % | hFE | NCV
+## Copilot Guidelines
 
-## Wytyczne dla Copilota
+### Adding New Measurement Modes
+Add to enum `MeterMode` in `OW18BParser.h`, then to `getModeString()`, `getUnitString()` in `OW18BParser.cpp`. Prefix and Divisor are generic — no per-mode changes needed.
 
-1. **Nowe tryby pomiaru** — dodaj do enum `MeasurementMode`, metod `getModeString()`, `getUnitString()`, `getDivisor()`, `getPrecision()` oraz logikę prefiksu w `parse()`
-2. **Nowe komponenty UI** — twórz za pomocą klas z JQB_WindowsLib (`Label`, `Button`, `Select`, `TextArea`, `ProgressBar`, `Chart`, `ValueDisplay`, `CheckBox`), dodawaj do `window`
-3. **Callbacki BLE** — rejestruj przez `ble.onXxx()` (onDeviceDiscovered, onScanComplete, onConnect, onDisconnect, onReceive, onError)
-4. **Nie zmieniaj sygnatury `setup()` i `loop()`** — to punkty wejścia frameworka
-5. **Parser jest bezstanowy** — wszystkie metody `Parser::*` są statyczne
-6. **Testowanie parsera** — twórz `std::vector<uint8_t>` z 6 bajtami i wywołuj `Parser::parse()`
-7. **Logowanie** — używaj `logMsg()` do logowania w `TextArea`
+### Adding New UI Components
+Create in `AppUI.cpp` → `createUI()`. Classes: `Label`, `Button`, `Select`, `TextArea`, `ProgressBar`, `Chart`, `ValueDisplay`, `CheckBox`. Add to `window` via `window->add()`. Use `styleBtn()` helper for consistent button styling. If a component needs to be accessed from other modules, declare it `extern` in `AppState.h` and define it in `AppState.cpp`.
+
+### Adding New Menu Commands
+1. Add `#define IDM_XXX` in `MenuHandler.h` (range 9000+, next free: 9060+)
+2. Add `AppendMenuW()` in `createAppMenu()` in `MenuHandler.cpp`
+3. Add `case IDM_XXX:` in `handleMenuCommand()` in `MenuHandler.cpp`
+4. If command is shared with UI — create `doXxx()` function in `AppState.h/.cpp`
+
+### Adding New Settings (INI)
+1. Add `extern` variable in `AppState.h`, define in `AppState.cpp`
+2. Load in `loadSettings()` and save in `saveSettings()` in `AppState.cpp`
+3. Optionally add menu item in `MenuHandler.cpp` with `MF_CHECKED`
+
+### Adding New Keyboard Shortcuts
+Add `hotkeyMgr->addHotkey(iniKey, label, defaultBind, action)` in `main.cpp` → `setup()`. The shortcuts dialog will automatically display the new entry.
+
+### BLE Callbacks
+Register in `BLEHandler.cpp` → `setupBLE()` via `ble.onXxx()` (onDeviceDiscovered, onScanComplete, onConnect, onDisconnect, onReceive, onError). Configure UUIDs and priority filters **after** `ble.init()` but **before** `ble.connect()`.
+
+### Extending the Overlay Window
+- Class `MeterOverlay` in `MeterOverlay.h/.cpp` — subclass of `OverlayWindow` from JQB_WindowsLib
+- Rendering in `onPaint(HDC memDC, const RECT& rc)` — double-buffered GDI, Consolas/Segoe UI fonts
+- Extending context menu: override `onBuildContextMenu(HMENU)` + `onMenuCommand(int)`, IDs from `9150+`
+- Data updated from `BLEHandler.cpp` — see block `// --- Update overlay window ---`
+- Position/colors auto-saved via `enablePersistence(config, "overlay")`
+
+### Second Window (beyond SimpleWindow)
+SimpleWindow is a **singleton** (`s_instance`) — do not create a second one!
+For additional windows use `OverlayWindow` from the library (subclass with `virtual onPaint()`)
+or raw WinAPI pattern with `GWLP_USERDATA`:
+1. `RegisterClassW()` with custom `WndProc`
+2. `CreateWindowExW()` with `lpParam = this`
+3. In `WM_NCCREATE` → `SetWindowLongPtrW(hwnd, GWLP_USERDATA, self)`
+4. In other msgs → `GetWindowLongPtrW(hwnd, GWLP_USERDATA)` → cast to `self`
+
+### Modal Dialogs
+Pattern: register `WNDCLASSW`, create window with `CreateWindowExW()` using `WS_EX_DLGMODALFRAME`, block main window via `EnableWindow(parent, FALSE)`, unblock in `WM_DESTROY`. See: `HotkeyManager::showSettingsDialog()` in the library.
+
+### Parser is Stateless
+All `OW18B::Parser::*` methods are static. Test: `OW18B::Parser::parse(std::vector<uint8_t>{...})`.
+
+### BLE Data Pipeline (fan-out)
+One received packet updates multiple consumers in `handleBLEData()`:
+1. `OW18B::Parser::parse()` — parsing
+2. `valueDisplay->updateValue()` — LCD display
+3. `overlayWindow->updateValue()` — OBS window
+4. `stats.addSample()` — MIN/MAX/AVG/PEAK statistics
+5. `chart->addDataPoint()` — real-time chart
+6. `dataLogger.addRow()` — CSV recording
+7. `logMsg()` — text log
+
+### Logging
+Use `logMsg(const wchar_t*)` or `logMsg(const std::wstring&)` from `AppState.h`.

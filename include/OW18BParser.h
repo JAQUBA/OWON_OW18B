@@ -2,89 +2,110 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <functional>
 
 // ============================================================================
 // OWON OW18B BLE Protocol Parser
 // ============================================================================
-// Protokół: 6 bajtów na pomiar
-//   Bajt 0:   Kod funkcji (tryb pomiaru)
-//   Bajt 1:   Skala / zakres (pozycja kropki dziesiętnej)
-//   Bajt 2-3: Flagi (AUTO, HOLD, itp.)
-//   Bajt 4-5: Wartość pomiaru (16-bit little-endian, signed)
-//             data[5] < 128  → wartość dodatnia = data[5]*256 + data[4]
-//             data[5] >= 128 → wartość ujemna   = -((data[5]-128)*256 + data[4])
+// Protokół: 6 bajtów na pomiar (format MartMet/JayTee42)
+//
+//   Bajty 0-1 (word0, little-endian):
+//     bity 0-2:  Divisor  (pozycja kropki dziesiętnej / OL / UL)
+//     bity 3-5:  Prefix   (pico, nano, µ, m, -, k, M, G)
+//     bity 6-9:  Mode     (DC_V, AC_V, DC_A, AC_A, Ω, F, Hz, %, °C, °F,
+//                           Diode, Continuity, hFE, NCV)
+//     bity 10+:  nieużywane
+//
+//   Bajt 2 (flagi):
+//     bit 0: HOLD         (Data Hold Mode)
+//     bit 1: REL/DELTA    (Relative Mode)
+//     bit 2: AUTO         (Auto Ranging)
+//     bit 3: LOW_BAT      (Niska bateria)
+//
+//   Bajt 3: zarezerwowany
+//
+//   Bajty 4-5 (value, signed 16-bit LE):
+//     Wartość pomiarowa ze znakiem
+//
+// Źródła:
+//   https://github.com/MartMet/OW18B (Blazor WebBluetooth — format bitowy)
+//   https://github.com/JayTee42/ow18b (Linux — opis flag i sign-magnitude)
 // ============================================================================
 
 namespace OW18B {
 
-// --- Tryby pomiaru (function codes) ---
-enum class MeasurementMode : uint8_t {
-    UNKNOWN         = 0x00,
-    DC_uA           = 0x11,   // Prąd stały µA
-    DC_mA           = 0x12,   // Prąd stały mA
-    DC_A            = 0x13,   // Prąd stały A
-    AC_uA           = 0x15,   // Prąd zmienny µA
-    AC_mA           = 0x16,   // Prąd zmienny mA
-    AC_A            = 0x17,   // Prąd zmienny A
-    DC_mV           = 0x19,   // Napięcie stałe mV
-    AC_mV           = 0x1A,   // Napięcie zmienne mV
-    AC_V            = 0x21,   // Napięcie zmienne V
-    DC_V            = 0x22,   // Napięcie stałe V
-    RESISTANCE      = 0x23,   // Rezystancja Ω
-    CONTINUITY      = 0x24,   // Ciągłość (buzzer)
-    DIODE           = 0x25,   // Test diody
-    CAPACITANCE     = 0x26,   // Pojemność F
-    FREQUENCY       = 0x27,   // Częstotliwość Hz
-    TEMPERATURE_C   = 0x28,   // Temperatura °C
-    TEMPERATURE_F   = 0x29,   // Temperatura °F
-    DUTY_CYCLE      = 0x2A,   // Współczynnik wypełnienia %
-    HFE             = 0x2D,   // Wzmocnienie tranzystora hFE
-    NCV             = 0x30,   // Non-Contact Voltage
+// --- Tryb pomiaru (4 bity, pozycja 6-9 w word0) ---
+enum class MeterMode : uint8_t {
+    DC_Voltage  = 0,
+    AC_Voltage  = 1,
+    DC_Ampere   = 2,
+    AC_Ampere   = 3,
+    Ohm         = 4,
+    Farad       = 5,
+    Hz          = 6,
+    Percent     = 7,
+    Celsius     = 8,
+    Fahrenheit  = 9,
+    Diode       = 10,
+    Continuity  = 11,
+    HFEC        = 12,
+    NCV         = 13,
+    UNKNOWN     = 0xFF
+};
+
+// --- Prefiks jednostki (3 bity, pozycja 3-5 w word0) ---
+enum class MeterPrefix : uint8_t {
+    Pico  = 0,
+    Nano  = 1,
+    Micro = 2,
+    Milli = 3,
+    None  = 4,
+    Kilo  = 5,
+    Mega  = 6,
+    Giga  = 7
+};
+
+// --- Dzielnik / punkt dziesiętny (3 bity, pozycja 0-2 w word0) ---
+enum class MeterDivisor : uint8_t {
+    D1       = 0,   // wartość × 1
+    D10      = 1,   // wartość / 10
+    D100     = 2,   // wartość / 100
+    D1000    = 3,   // wartość / 1000
+    D10000   = 4,   // wartość / 10000
+    ERR      = 5,   // Błąd
+    UL       = 6,   // Under Limit
+    OL       = 7    // Over Limit
 };
 
 // --- Struktura wyniku pomiaru ---
 struct Measurement {
-    MeasurementMode mode    = MeasurementMode::UNKNOWN;
-    double          value   = 0.0;
-    std::wstring    unit;       // np. L"V", L"mV", L"Ω"
-    std::wstring    prefix;     // np. L"k", L"M", L"m", L"µ", L"n"
-    std::wstring    modeStr;    // np. L"DC V", L"AC mA"
-    uint8_t         scale   = 0;
-    uint8_t         flags1  = 0;
-    uint8_t         flags2  = 0;
-    bool            isAuto  = false;
-    bool            isHold  = false;
-    bool            isDelta = false;
-    bool            isOL    = false;   // Over Limit (przepełnienie)
-    bool            isValid = false;
-    int             precision = 2;     // Liczba miejsc po przecinku
+    MeterMode       mode      = MeterMode::UNKNOWN;
+    MeterPrefix     prefixId  = MeterPrefix::None;
+    MeterDivisor    divisor   = MeterDivisor::D1;
+    double          value     = 0.0;
+    std::wstring    unit;        // np. L"V", L"A", L"Ω"
+    std::wstring    prefix;      // np. L"k", L"M", L"m", L"µ"
+    std::wstring    modeStr;     // np. L"DC V", L"AC A", L"Ω"
+    bool            isAuto     = false;
+    bool            isHold     = false;
+    bool            isDelta    = false;
+    bool            isLowBat   = false;
+    bool            isOL       = false;
+    bool            isUL       = false;
+    bool            isValid    = false;
+    int             precision  = 0;
+    uint16_t        rawWord0   = 0;    // Surowe bytes 0-1 (debug)
+    int16_t         rawValue   = 0;    // Surowe bytes 4-5 (debug)
 };
 
-// --- Klasa parsera ---
+// --- Klasa parsera (bezstanowa — wszystkie metody statyczne) ---
 class Parser {
 public:
-    // Parsuj surowe dane BLE (minimum 6 bajtów)
     static Measurement parse(const std::vector<uint8_t>& data);
-
-    // Pobierz nazwę trybu jako wide string
-    static std::wstring getModeString(MeasurementMode mode);
-
-    // Pobierz jednostkę jako wide string
-    static std::wstring getUnitString(MeasurementMode mode);
-
-    // Pobierz prefiks jednostki
-    static std::wstring getPrefixString(MeasurementMode mode);
-
-private:
-    // Dekoduj wartość z bajtów 4-5
-    static double decodeValue(uint8_t low, uint8_t high, bool& isNegative);
-
-    // Oblicz dzielnik na podstawie trybu i skali
-    static double getDivisor(MeasurementMode mode, uint8_t scale);
-
-    // Oblicz precyzję wyświetlania
-    static int getPrecision(MeasurementMode mode, uint8_t scale);
+    static std::wstring getModeString(MeterMode mode);
+    static std::wstring getUnitString(MeterMode mode);
+    static std::wstring getPrefixString(MeterPrefix prefix);
+    static double       getDivisorValue(MeterDivisor divisor);
+    static int          getPrecision(MeterDivisor divisor);
 };
 
 } // namespace OW18B
