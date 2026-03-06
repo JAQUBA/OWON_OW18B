@@ -39,6 +39,9 @@ void setup() {
     // --- Callbacki i inicjalizacja BLE ---
     setupBLE();
 
+    // --- Auto-łączenie z ostatnim urządzeniem ---
+    doAutoReconnect();
+
     // --- Skróty klawiaturowe ---
     hotkeyMgr = new HotkeyManager(config);
 

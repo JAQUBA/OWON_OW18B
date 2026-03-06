@@ -175,6 +175,7 @@ void setupBLE() {
         lblStatus->setTextColor(RGB(50, 220, 80));
         logMsg(L"✔ Połączono z urządzeniem BLE!");
         resetStats();
+        saveSettings();
     });
 
     ble.onDisconnect([]() {

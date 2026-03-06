@@ -55,7 +55,10 @@ extern HotkeyManager*  hotkeyMgr;
 extern bool            isConnected;
 extern bool            chartEnabled;
 extern bool            logRawData;
+extern bool            autoReconnect;
 extern std::wstring    lastUnit;
+extern std::wstring    lastDeviceAddress;
+extern std::wstring    lastDeviceName;
 extern uint32_t        measurementCount;
 extern std::vector<std::string> deviceNames;
 
@@ -85,5 +88,6 @@ void doConnectBLE();
 void doDisconnectBLE();
 void doRecordStart();
 void doRecordStop();
+void doAutoReconnect();
 
 #endif // APP_STATE_H

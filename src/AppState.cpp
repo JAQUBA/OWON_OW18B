@@ -49,7 +49,10 @@ HotkeyManager*  hotkeyMgr       = nullptr;
 bool            isConnected      = false;
 bool            chartEnabled     = true;
 bool            logRawData       = false;
+bool            autoReconnect    = true;
 std::wstring    lastUnit         = L"";
+std::wstring    lastDeviceAddress = L"";
+std::wstring    lastDeviceName    = L"";
 uint32_t        measurementCount = 0;
 std::vector<std::string> deviceNames;
 
@@ -147,13 +150,19 @@ std::wstring formatHexDump(const std::vector<uint8_t>& data) {
 // ============================================================================
 
 void loadSettings() {
-    chartEnabled = config.getValue("chart_enabled", "1") == "1";
-    logRawData   = config.getValue("log_raw_data", "0") == "1";
+    chartEnabled    = config.getValue("chart_enabled", "1") == "1";
+    logRawData      = config.getValue("log_raw_data", "0") == "1";
+    autoReconnect   = config.getValue("auto_reconnect", "1") == "1";
+    lastDeviceAddress = StringUtils::utf8ToWide(config.getValue("last_device_address", ""));
+    lastDeviceName    = StringUtils::utf8ToWide(config.getValue("last_device_name", ""));
 }
 
 void saveSettings() {
-    config.setValue("chart_enabled", chartEnabled ? "1" : "0");
-    config.setValue("log_raw_data",  logRawData   ? "1" : "0");
+    config.setValue("chart_enabled",      chartEnabled    ? "1" : "0");
+    config.setValue("log_raw_data",       logRawData      ? "1" : "0");
+    config.setValue("auto_reconnect",     autoReconnect   ? "1" : "0");
+    config.setValue("last_device_address", StringUtils::wideToUtf8(lastDeviceAddress));
+    config.setValue("last_device_name",    StringUtils::wideToUtf8(lastDeviceName));
 }
 
 // ============================================================================
@@ -177,6 +186,11 @@ void doConnectBLE() {
         logMsg(L"Łączenie z urządzeniem...");
         lblStatus->setText(L"Status: Łączenie...");
         lblStatus->setTextColor(RGB(220, 200, 50));
+
+        // Zapisz dane urządzenia do auto-reconnect
+        lastDeviceAddress = devices[idx].address;
+        lastDeviceName = devices[idx].name;
+
         ble.connect(devices[idx].address);
     } else {
         logMsg(L"⚠ Wybierz urządzenie z listy!");
@@ -209,4 +223,14 @@ void doRecordStop() {
         logMsg(buf);
         updateRecordLabel();
     }
+}
+
+void doAutoReconnect() {
+    if (!autoReconnect || lastDeviceAddress.empty()) return;
+
+    std::wstring msg = L"Auto-łączenie z: " + lastDeviceName;
+    logMsg(msg);
+    lblStatus->setText(L"Status: Auto-łączenie...");
+    lblStatus->setTextColor(RGB(220, 200, 50));
+    ble.connect(lastDeviceAddress);
 }

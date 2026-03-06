@@ -81,6 +81,11 @@ void createAppMenu(SimpleWindow* win) {
             saveSettings();
             logMsg(checked ? L"Logowanie RAW włączone" : L"Logowanie RAW wyłączone");
         });
+        m.addCheckItem(L"Auto-łączenie z ostatnim urządzeniem", autoReconnect, [](bool checked) {
+            autoReconnect = checked;
+            saveSettings();
+            logMsg(checked ? L"Auto-łączenie włączone" : L"Auto-łączenie wyłączone");
+        });
         m.addSeparator();
         m.addItem(L"Resetuj statystyki", []() {
             resetStats();
