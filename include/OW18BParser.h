@@ -23,8 +23,8 @@
 //
 //   Bajt 3: zarezerwowany
 //
-//   Bajty 4-5 (value, signed 16-bit LE):
-//     Wartość pomiarowa ze znakiem
+//   Bajty 4-5 (value, sign-magnitude 16-bit LE):
+//     bit 15 = znak (1=ujemna), bity 0-14 = wartość bezwzględna
 //
 // Źródła:
 //   https://github.com/MartMet/OW18B (Blazor WebBluetooth — format bitowy)

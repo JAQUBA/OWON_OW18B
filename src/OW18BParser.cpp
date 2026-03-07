@@ -122,8 +122,12 @@ Measurement Parser::parse(const std::vector<uint8_t>& data) {
     m.isAuto   = (flags & 0x04) != 0;   // bit 2: Auto Ranging
     m.isLowBat = (flags & 0x08) != 0;   // bit 3: Low Battery
 
-    // --- Bajty 4-5: Wartość (signed 16-bit LE) ---
-    int16_t signedVal = static_cast<int16_t>(data[4] | (data[5] << 8));
+    // --- Bajty 4-5: Wartość (sign-magnitude 16-bit LE) ---
+    // Bit 15 = znak (1=ujemna), bity 0-14 = wartość bezwzględna
+    uint16_t rawVal = data[4] | (data[5] << 8);
+    bool isNegative = (rawVal & 0x8000) != 0;
+    int16_t magnitude = static_cast<int16_t>(rawVal & 0x7FFF);
+    int16_t signedVal = isNegative ? -magnitude : magnitude;
     m.rawValue = signedVal;
 
     // --- OL / UL / ERR ---
