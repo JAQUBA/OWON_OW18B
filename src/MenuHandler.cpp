@@ -53,14 +53,22 @@ void createAppMenu(SimpleWindow* win) {
             }
             if (overlayWindow->isOpen()) {
                 overlayWindow->close();
-                logMsg(L"Okno OBS zamknięte");
+                overlayAutoOpen = false;
+                saveSettings();
+                logMsg(L"Okno OBS zamkni\u0119te");
             } else {
                 HWND parent = window ? window->getHandle() : NULL;
-                if (overlayWindow->open(parent))
+                if (overlayWindow->open(parent)) {
+                    overlayAutoOpen = true;
+                    saveSettings();
                     logMsg(L"Okno OBS otwarte");
-                else
-                    logMsg(L"⚠ Nie udało się otworzyć okna OBS");
+                } else {
+                    logMsg(L"\u26a0 Nie uda\u0142o si\u0119 otworzy\u0107 okna OBS");
+                }
             }
+        });
+        m.addItem(L"Okno log\u00f3w", []() {
+            doToggleLogWindow();
         });
     });
 
@@ -86,7 +94,19 @@ void createAppMenu(SimpleWindow* win) {
             saveSettings();
             logMsg(checked ? L"Auto-łączenie włączone" : L"Auto-łączenie wyłączone");
         });
-        m.addSeparator();
+        m.addCheckItem(L"Minimalizuj do zasobnika", minimizeToTray, [](bool checked) {
+            minimizeToTray = checked;
+            saveSettings();
+            logMsg(checked ? L"Minimalizacja do zasobnika włączona" : L"Minimalizacja do zasobnika wyłączona");
+        });        m.addCheckItem(L"Autostart: zasobnik + overlay", autoStartTray, [](bool checked) {
+            autoStartTray = checked;
+            if (checked) {
+                minimizeToTray = true;
+                overlayAutoOpen = true;
+            }
+            saveSettings();
+            logMsg(checked ? L"Autostart z zasobnikiem i overlay w\u0142\u0105czony" : L"Autostart z zasobnikiem i overlay wy\u0142\u0105czony");
+        });        m.addSeparator();
         m.addItem(L"Resetuj statystyki", []() {
             resetStats();
             logMsg(L"Statystyki zresetowane");

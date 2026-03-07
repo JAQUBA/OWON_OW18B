@@ -31,11 +31,11 @@ OWON_OW18B/
 
 | Module | Responsibility |
 |--------|---------------|
-| **main.cpp** | `setup()` / `loop()` — window, menu, UI, BLE, hotkeys init. ~65 lines. |
-| **AppState** | All global variable definitions (`window`, `ble`, `stats`, `config`, `hotkeyMgr`, `overlayWindow`), helpers (`logMsg()`, `sendCommand()`, `resetStats()`), shared actions (`doScanBLE()`, `doConnectBLE()`, `doRecordStart()` etc.), INI load/save |
+| **main.cpp** | `setup()` / `loop()` — window, menu, UI, BLE, hotkeys, tray icon init; `TraySubclassProc` for SC_MINIMIZE interception; autostart logic |
+| **AppState** | All global variable definitions (`window`, `ble`, `stats`, `config`, `hotkeyMgr`, `overlayWindow`, `trayIcon`, `logWindow`), helpers (`logMsg()`, `sendCommand()`, `resetStats()`), shared actions (`doScanBLE()`, `doConnectBLE()`, `doRecordStart()`, `doToggleLogWindow()` etc.), INI load/save |
 | **AppUI** | `createUI(SimpleWindow*)` — creates all UI components with dark theme; uses `styleBtn()` helper for compact button creation |
 | **BLEHandler** | `setupBLE()` — BLE callback registration and adapter init; `handleBLEData()` — packet parsing, UI/overlay/stats/chart/CSV update |
-| **MenuHandler** | `createAppMenu()` — HMENU menu bar construction; `handleMenuCommand(int)` — command routing; `updateMenuChecks()` — checkmark sync |
+| **MenuHandler** | `createAppMenu()` — MenuBar-based menu construction with lambda callbacks (uses JQB_WindowsLib `MenuBar` class) |
 | **MeterOverlay** | `OverlayWindow` subclass from library — renders measurement value (Consolas) and mode/flags (Segoe UI) in OBS overlay |
 | **OW18B_Commands** | Inline functions returning `std::vector<uint8_t>{button_id, press_type}` — 2-byte format |
 | **OW18BParser** | Stateless 6-byte protocol parser — `OW18B::Parser::parse()`. MartMet/OW18B bitfield format |
@@ -96,19 +96,18 @@ static void styleBtn(SimpleWindow* win, Button* btn,
 ### Menu Bar
 
 ```
-File → Record CSV | Stop Recording | Close
-Connection → Scan BLE | Connect | Disconnect
-Control → SELECT | HOLD | RANGE | Hz/DUTY
-View → OBS Overlay Window
-Settings → Keyboard Shortcuts... | ✓ Chart Active | ✓ Log RAW Data | Reset Statistics
-Help → About...
+Plik → Nagrywaj CSV | Zatrzymaj nagrywanie | Zamknij
+Połączenie → Skanuj BLE | Połącz | Rozłącz
+Sterowanie → SELECT | HOLD | RANGE | Hz/DUTY | SELECT (długie) | HOLD (długie) | RANGE (długie) | Hz/DUTY (długie)
+Widok → Okno OBS (overlay) | Okno logów
+Ustawienia → Skróty klawiaturowe... | ✓ Wykres aktywny | ✓ Loguj dane RAW | ✓ Auto-łączenie | ✓ Minimalizuj do zasobnika | ✓ Autostart: zasobnik + overlay | Resetuj statystyki
+Pomoc → O programie...
 ```
 
-- Menu created in `MenuHandler::createAppMenu()` as `HMENU`, set via `window->setMenu(menu)`
-- Command routing via `window->onMenuCommand(handleMenuCommand)`
-- Menu command IDs: range `9000+` (defined in `MenuHandler.h`: `IDM_FILE_*`, `IDM_CONN_*`, `IDM_CTRL_*`, `IDM_VIEW_*`, `IDM_SET_*`, `IDM_HELP_*`)
-- Settings `chart_enabled` and `log_raw_data` saved to `owon_meter.ini` via `ConfigManager`
-- Checkmarks synced via `updateMenuChecks()`
+- Menu created in `MenuHandler::createAppMenu()` using `MenuBar` class from JQB_WindowsLib
+- Each menu uses `menuBar->addMenu(label, lambda)` with `PopupMenu` API: `addItem()`, `addCheckItem()`, `addSeparator()`
+- Checkbox items use `addCheckItem(label, boolRef, onChange)` — auto-synced state
+- Settings saved to `owon_meter.ini` via `ConfigManager`
 
 ### Overlay Window (OBS Studio)
 
@@ -120,6 +119,31 @@ Help → About...
 - `enablePersistence(config, "overlay")` — auto-save/load position and colors to `owon_meter.ini`
 - Data updated in `BLEHandler.cpp` after each received packet
 - Base context menu IDs: 9100–9149 (from library), subclass: 9150+
+
+### System Tray Icon
+
+- Uses `TrayIcon` class from JQB_WindowsLib (`UI/TrayIcon/TrayIcon.h`)
+- Created in `main.cpp` → `setup()` — `trayIcon->create(hwnd, 101, L"OW18B Meter")`
+- Minimize to tray: `TraySubclassProc` intercepts `SC_MINIMIZE` → `ShowWindow(SW_HIDE)` + `trayIcon->show()`
+- Restore: `trayIcon->onRestore()` → `ShowWindow(SW_SHOW)` + `SetForegroundWindow()`
+- Behavior controlled by `minimizeToTray` setting (checkbox in Ustawienia menu)
+- Tray icon always created but `show()` only called when minimizing with `minimizeToTray` enabled
+
+### Log Window
+
+- Uses `LogWindow` class from JQB_WindowsLib (`UI/LogWindow/LogWindow.h`)
+- Created on first use in `doToggleLogWindow()` in `AppState.cpp`
+- Styled: Consolas 14pt, dark theme (`RGB(22,22,28)` background, `RGB(170,180,195)` text)
+- `logMsg()` writes to `logWindow->appendMessage()` instead of inline TextArea
+- Position auto-saved via `enablePersistence(config, "logwin")`
+- Toggle via menu: Widok → Okno logów
+
+### Autostart Mode (Tray + Overlay)
+
+- Setting `autoStartTray` (checkbox: Ustawienia → Autostart: zasobnik + overlay)
+- When enabled: forces `minimizeToTray = true` and `overlayAutoOpen = true`
+- On startup: app starts minimized to tray with overlay window open
+- Use case: OBS streaming — meter overlay visible, main window hidden in tray
 
 ### Keyboard Shortcuts Dialog
 
@@ -151,6 +175,17 @@ File managed by `ConfigManager` (auto-load in constructor, auto-save in destruct
 | `overlay_ontop` | Overlay always on top | `1` |
 | `overlay_bg` | Overlay background color (COLORREF) | `0` (black) |
 | `overlay_text` | Overlay text color (COLORREF) | `65280` (green) |
+| `auto_reconnect` | Auto-reconnect to last device | `0` |
+| `last_device_address` | Last connected BLE device address | (empty) |
+| `last_device_name` | Last connected BLE device name | (empty) |
+| `minimize_to_tray` | Minimize to system tray | `1` |
+| `overlay_auto_open` | Auto-open overlay on startup | `0` |
+| `start_minimized` | Start app minimized | `0` |
+| `auto_start_tray` | Autostart: tray + overlay | `0` |
+| `logwin_x` | Log window X position | (auto) |
+| `logwin_y` | Log window Y position | (auto) |
+| `logwin_w` | Log window width | (auto) |
+| `logwin_h` | Log window height | (auto) |
 
 ### BLE Protocol OWON OW18B
 
@@ -219,10 +254,9 @@ Add to enum `MeterMode` in `OW18BParser.h`, then to `getModeString()`, `getUnitS
 Create in `AppUI.cpp` → `createUI()`. Classes: `Label`, `Button`, `Select`, `TextArea`, `ProgressBar`, `Chart`, `ValueDisplay`, `CheckBox`. Add to `window` via `window->add()`. Use `styleBtn()` helper for consistent button styling. If a component needs to be accessed from other modules, declare it `extern` in `AppState.h` and define it in `AppState.cpp`.
 
 ### Adding New Menu Commands
-1. Add `#define IDM_XXX` in `MenuHandler.h` (range 9000+, next free: 9060+)
-2. Add `AppendMenuW()` in `createAppMenu()` in `MenuHandler.cpp`
-3. Add `case IDM_XXX:` in `handleMenuCommand()` in `MenuHandler.cpp`
-4. If command is shared with UI — create `doXxx()` function in `AppState.h/.cpp`
+1. In `createAppMenu()` in `MenuHandler.cpp`, add item via `m.addItem(label, lambda)` or `m.addCheckItem(label, boolRef, onChange)` inside the appropriate menu lambda
+2. If command is shared with UI — create `doXxx()` function in `AppState.h/.cpp`
+3. MenuBar class handles all ID management and routing — no manual `IDM_` defines needed
 
 ### Adding New Settings (INI)
 1. Add `extern` variable in `AppState.h`, define in `AppState.cpp`
@@ -268,4 +302,4 @@ One received packet updates multiple consumers in `handleBLEData()`:
 7. `logMsg()` — text log
 
 ### Logging
-Use `logMsg(const wchar_t*)` or `logMsg(const std::wstring&)` from `AppState.h`.
+Use `logMsg(const wchar_t*)` or `logMsg(const std::wstring&)` from `AppState.h`. Logs are displayed in a separate `LogWindow` (standalone window from JQB_WindowsLib), not in the main window.

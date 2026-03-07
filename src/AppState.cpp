@@ -6,9 +6,11 @@
 
 #include <Core.h>
 #include <IO/BLE/BLE.h>
+#include <UI/SimpleWindow/SimpleWindow.h>
+#include <UI/TrayIcon/TrayIcon.h>
+#include <UI/LogWindow/LogWindow.h>
 #include <UI/Label/Label.h>
 #include <UI/Select/Select.h>
-#include <UI/TextArea/TextArea.h>
 #include <UI/ProgressBar/ProgressBar.h>
 #include <UI/ValueDisplay/ValueDisplay.h>
 #include <UI/Chart/Chart.h>
@@ -35,8 +37,9 @@ Label*          lblMode         = nullptr;
 Label*          lblMinMax       = nullptr;
 Chart*          chart           = nullptr;
 Label*          lblRecordStatus = nullptr;
-TextArea*       txtLog          = nullptr;
 MeterOverlay*   overlayWindow    = nullptr;
+TrayIcon*       trayIcon         = nullptr;
+LogWindow*      logWindow        = nullptr;
 
 // Obiekty aplikacji
 BLE             ble;
@@ -50,6 +53,10 @@ bool            isConnected      = false;
 bool            chartEnabled     = true;
 bool            logRawData       = false;
 bool            autoReconnect    = true;
+bool            minimizeToTray   = true;
+bool            overlayAutoOpen  = false;
+bool            startMinimized   = false;
+bool            autoStartTray    = false;
 std::wstring    lastUnit         = L"";
 std::wstring    lastDeviceAddress = L"";
 std::wstring    lastDeviceName    = L"";
@@ -66,9 +73,8 @@ const std::wstring OWON_WRITE_CHARACTERISTIC_UUID   = L"0000fff3-0000-1000-8000-
 // ============================================================================
 
 void logMsg(const wchar_t* msg) {
-    if (txtLog) {
-        txtLog->append(msg);
-        txtLog->append(L"\r\n");
+    if (logWindow) {
+        logWindow->appendMessage(msg);
     }
 }
 
@@ -153,6 +159,10 @@ void loadSettings() {
     chartEnabled    = config.getValue("chart_enabled", "1") == "1";
     logRawData      = config.getValue("log_raw_data", "0") == "1";
     autoReconnect   = config.getValue("auto_reconnect", "1") == "1";
+    minimizeToTray  = config.getValue("minimize_to_tray", "1") == "1";
+    overlayAutoOpen = config.getValue("overlay_auto_open", "0") == "1";
+    startMinimized  = config.getValue("start_minimized", "0") == "1";
+    autoStartTray   = config.getValue("auto_start_tray", "0") == "1";
     lastDeviceAddress = StringUtils::utf8ToWide(config.getValue("last_device_address", ""));
     lastDeviceName    = StringUtils::utf8ToWide(config.getValue("last_device_name", ""));
 }
@@ -161,6 +171,10 @@ void saveSettings() {
     config.setValue("chart_enabled",      chartEnabled    ? "1" : "0");
     config.setValue("log_raw_data",       logRawData      ? "1" : "0");
     config.setValue("auto_reconnect",     autoReconnect   ? "1" : "0");
+    config.setValue("minimize_to_tray",    minimizeToTray  ? "1" : "0");
+    config.setValue("overlay_auto_open",   overlayAutoOpen ? "1" : "0");
+    config.setValue("start_minimized",     startMinimized  ? "1" : "0");
+    config.setValue("auto_start_tray",      autoStartTray   ? "1" : "0");
     config.setValue("last_device_address", StringUtils::wideToUtf8(lastDeviceAddress));
     config.setValue("last_device_name",    StringUtils::wideToUtf8(lastDeviceName));
 }
@@ -233,4 +247,19 @@ void doAutoReconnect() {
     lblStatus->setText(L"Status: Auto-łączenie...");
     lblStatus->setTextColor(RGB(220, 200, 50));
     ble.connect(lastDeviceAddress);
+}
+void doToggleLogWindow() {
+    if (!logWindow) {
+        logWindow = new LogWindow();
+        logWindow->setTitle(L"OW18B \u2014 Logi");
+        logWindow->enablePersistence(config, "logwin");
+    }
+    if (logWindow->isOpen()) {
+        logWindow->close();
+        logMsg(L"Okno log\u00f3w zamkni\u0119te");
+    } else {
+        HWND parent = window ? window->getHandle() : NULL;
+        if (logWindow->open(parent))
+            logMsg(L"Okno log\u00f3w otwarte");
+    }
 }

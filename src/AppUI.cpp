@@ -188,17 +188,4 @@ void createUI(SimpleWindow* win) {
     chart->setRefreshRate(100);
     chart->setColors(RGB(45, 45, 55), RGB(120, 125, 140), RGB(0, 200, 255));
     y += 224;
-
-    // --- Log ---
-    addSectionHeader(win, m, y, 200, L"LOG");
-    styleBtn(win, new Button(m + 700, y - 1, 70, 16, "Wyczyść", [](Button*) {
-        if (txtLog) txtLog->setText(L""); logMsg(L"Log wyczyszczony");
-    }), colDim, colDimText, colDimH);
-    y += 18;
-
-    txtLog = new TextArea(m, y, w, 140);
-    win->add(txtLog);
-    txtLog->setFont(L"Consolas", 11, false);
-    txtLog->setTextColor(RGB(170, 180, 195));
-    txtLog->setBackColor(RGB(22, 22, 28));
 }

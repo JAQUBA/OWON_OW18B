@@ -13,6 +13,30 @@
 #include "BLEHandler.h"
 #include "MenuHandler.h"
 #include "OW18B_Commands.h"
+#include "MeterOverlay.h"
+
+#include <UI/TrayIcon/TrayIcon.h>
+#include <UI/LogWindow/LogWindow.h>
+#include <commctrl.h>
+
+// ============================================================================
+// Subclass proc — przechwycenie minimalizacji do zasobnika
+// ============================================================================
+static LRESULT CALLBACK TraySubclassProc(HWND hwnd, UINT msg, WPARAM wParam,
+                                          LPARAM lParam, UINT_PTR, DWORD_PTR) {
+    // Przekaż komunikaty zasobnika
+    if (trayIcon && trayIcon->processMessage(msg, wParam, lParam))
+        return 0;
+
+    // Minimalizacja → zasobnik
+    if (msg == WM_SYSCOMMAND && (wParam & 0xFFF0) == SC_MINIMIZE && minimizeToTray) {
+        ShowWindow(hwnd, SW_HIDE);
+        if (trayIcon) trayIcon->show();
+        return 0;
+    }
+
+    return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
 
 // ============================================================================
 // setup() — Inicjalizacja aplikacji
@@ -22,14 +46,38 @@ void setup() {
     loadSettings();
 
     // --- Okno główne (z ikoną) ---
-    window = new SimpleWindow(800, 790, "OWON OW18B — Multimetr BLE", 101);
+    window = new SimpleWindow(800, 570, "OWON OW18B — Multimetr BLE", 101);
     window->init();
+
+    // --- Ikona zasobnika systemowego ---
+    trayIcon = new TrayIcon();
+    trayIcon->create(window->getHandle(), 101, L"OWON OW18B — Multimetr BLE");
+    trayIcon->onRestore([]() {
+        ShowWindow(window->getHandle(), SW_SHOW);
+        ShowWindow(window->getHandle(), SW_RESTORE);
+        SetForegroundWindow(window->getHandle());
+        trayIcon->hide();
+    });
+    SetWindowSubclass(window->getHandle(), TraySubclassProc, 1, 0);
 
     // --- Pasek menu ---
     createAppMenu(window);
 
     // --- Zapis ustawień przy zamknięciu ---
     window->onClose([]() {
+        // Zapamiętaj stan overlay
+        if (overlayWindow && overlayWindow->isOpen()) {
+            overlayAutoOpen = true;
+            overlayWindow->close();  // savePosition() wewnątrz close()
+        } else {
+            overlayAutoOpen = false;
+        }
+
+        // Zapamiętaj stan minimalizacji do tray
+        startMinimized = !IsWindowVisible(window->getHandle());
+
+        if (trayIcon) trayIcon->remove();
+        if (logWindow) logWindow->close();
         saveSettings();
     });
 
@@ -41,6 +89,19 @@ void setup() {
 
     // --- Auto-łączenie z ostatnim urządzeniem ---
     doAutoReconnect();
+
+    // --- Auto-otwarcie okna overlay ---
+    if (overlayAutoOpen || autoStartTray) {
+        if (!overlayWindow) overlayWindow = new MeterOverlay();
+        overlayWindow->open(window->getHandle());
+        logMsg(L"Overlay otwarty automatycznie.");
+    }
+
+    // --- Start zminimalizowany do tray ---
+    if ((startMinimized && minimizeToTray) || autoStartTray) {
+        ShowWindow(window->getHandle(), SW_HIDE);
+        if (trayIcon) trayIcon->show();
+    }
 
     // --- Skróty klawiaturowe ---
     hotkeyMgr = new HotkeyManager(config);

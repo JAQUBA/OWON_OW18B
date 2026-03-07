@@ -13,7 +13,6 @@ class SimpleWindow;
 class Label;
 class Select;
 class Button;
-class TextArea;
 class ProgressBar;
 class Chart;
 class ValueDisplay;
@@ -23,6 +22,8 @@ class HotkeyManager;
 class ConfigManager;
 class DataLogger;
 class MeterOverlay;
+class TrayIcon;
+class LogWindow;
 struct Statistics;
 
 // ============================================================================
@@ -37,8 +38,9 @@ extern Label*          lblMode;
 extern Label*          lblMinMax;
 extern Chart*          chart;
 extern Label*          lblRecordStatus;
-extern TextArea*       txtLog;
 extern MeterOverlay*   overlayWindow;
+extern TrayIcon*       trayIcon;
+extern LogWindow*      logWindow;
 
 // ============================================================================
 // Obiekty aplikacji
@@ -56,6 +58,10 @@ extern bool            isConnected;
 extern bool            chartEnabled;
 extern bool            logRawData;
 extern bool            autoReconnect;
+extern bool            minimizeToTray;
+extern bool            overlayAutoOpen;
+extern bool            startMinimized;
+extern bool            autoStartTray;
 extern std::wstring    lastUnit;
 extern std::wstring    lastDeviceAddress;
 extern std::wstring    lastDeviceName;
@@ -89,5 +95,6 @@ void doDisconnectBLE();
 void doRecordStart();
 void doRecordStop();
 void doAutoReconnect();
+void doToggleLogWindow();
 
 #endif // APP_STATE_H
